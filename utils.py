@@ -3,7 +3,7 @@ import torch
 
 
 class ReplayBuffer(object):
-    def __init__(self, state_dim, action_dim, device, max_size=int(1e6)):
+    def __init__(self, state_dim, action_dim, max_size=int(1e6)):
         self.max_size = max_size
         self.ptr = 0
         self.size = 0
@@ -14,7 +14,7 @@ class ReplayBuffer(object):
         self.reward = np.zeros((max_size, 1))
         self.not_done = np.zeros((max_size, 1))
 
-        self.device = device
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
     def add(self, state, action, next_state, reward, done):
@@ -39,25 +39,18 @@ class ReplayBuffer(object):
             torch.FloatTensor(self.not_done[ind]).to(self.device)
         )
 
+    def convert_D4RL(self, dataset):
+        self.state = dataset['observations']
+        self.action = dataset['actions']
+        self.next_state = dataset['next_observations']
+        self.reward = dataset['rewards'].reshape(-1, 1)
+        self.not_done = 1. - dataset['terminals'].reshape(-1, 1)
+        self.size = self.state.shape[0]
 
-    def save(self, save_folder):
-        np.save(f"{save_folder}_state.npy", self.state[:self.size])
-        np.save(f"{save_folder}_action.npy", self.action[:self.size])
-        np.save(f"{save_folder}_next_state.npy", self.next_state[:self.size])
-        np.save(f"{save_folder}_reward.npy", self.reward[:self.size])
-        np.save(f"{save_folder}_not_done.npy", self.not_done[:self.size])
-        np.save(f"{save_folder}_ptr.npy", self.ptr)
-
-
-    def load(self, save_folder, size=-1):
-        reward_buffer = np.load(f"{save_folder}_reward.npy")
-
-        # Adjust crt_size if we're using a custom size
-        size = min(int(size), self.max_size) if size > 0 else self.max_size
-        self.size = min(reward_buffer.shape[0], size)
-
-        self.state[:self.size] = np.load(f"{save_folder}_state.npy")[:self.size]
-        self.action[:self.size] = np.load(f"{save_folder}_action.npy")[:self.size]
-        self.next_state[:self.size] = np.load(f"{save_folder}_next_state.npy")[:self.size]
-        self.reward[:self.size] = reward_buffer[:self.size]
-        self.not_done[:self.size] = np.load(f"{save_folder}_not_done.npy")[:self.size]
+    def normalize_states(self, eps=1e-3, mean=None, std=None):
+        if mean is None and std is None:
+            mean = self.state.mean(0, keepdims=True)
+            std = self.state.std(0, keepdims=True) + eps
+        self.state = (self.state - mean) / std
+        self.next_state = (self.next_state - mean) / std
+        return mean, std
