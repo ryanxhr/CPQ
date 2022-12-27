@@ -6,7 +6,7 @@ import os
 import d4rl
 
 import utils
-import BCQ_L
+import BCQ_L, CPQ
 
 
 # Runs policy for X episodes and returns D4RL score
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # Experiment
-    parser.add_argument("--algorithm", default="BCQ")  # Policy name
+    parser.add_argument("--algorithm", default="BCQ_L")  # Policy name
     parser.add_argument("--env", default="hopper-medium-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=0, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
@@ -75,8 +75,8 @@ if __name__ == "__main__":
     action_dim = env.action_space.shape[0]
     max_action = float(env.action_space.high[0])
 
-    if args.algorithm == 'BCQ':
-        policy = BCQ.BCQ(state_dim, action_dim, max_action, phi=args.phi)
+    if args.algorithm == 'BCQ_L':
+        policy = BCQ_L.BCQ_L(state_dim, action_dim, max_action, phi=args.phi)
         algo_name = f"{args.algorithm}_phi-{args.phi}"
     elif args.algorithm == 'CPQ':
         policy = CPQ.CPQ(state_dim, action_dim, max_action, alpha=args.alpha)

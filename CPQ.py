@@ -93,7 +93,7 @@ class VAE(nn.Module):
         return self.max_action * torch.tanh(self.d3(a))
 
 
-class BCQ(object):
+class CPQ(object):
     def __init__(self, state_dim, action_dim, max_action, discount=0.99, tau=0.005, lmbda=0.75, phi=0.05):
         latent_dim = action_dim * 2
 
