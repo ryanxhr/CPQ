@@ -185,7 +185,7 @@ class BCQ_L(object):
             # Take max over each action sampled from the VAE
             target_Qr = target_Qr.reshape(batch_size, -1).max(1)[0].reshape(-1, 1)
 
-            target_Qr = reward + not_done * self.discount * target_Qr
+            target_Qr = reward + not_done * 0.99 * target_Qr
 
         current_Qr1, current_Qr2 = self.reward_critic(state, action)
         reward_critic_loss = F.mse_loss(current_Qr1, target_Qr) + F.mse_loss(current_Qr2, target_Qr)

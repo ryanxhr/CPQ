@@ -51,7 +51,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_model", action="store_true")  # Save model and optimizer parameters
     parser.add_argument("--load_model", default="")  # Model load file name, "" doesn't load, "default" uses file_name
     parser.add_argument("--batch_size", default=256, type=int)  # Batch size for both actor and critic
-    parser.add_argument("--discount", default=0.99)  # Discount factor
+    parser.add_argument("--discount", default=1.0)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
     parser.add_argument("--normalize", default=True)
     parser.add_argument("--constraint_threshold", default=500.0)
