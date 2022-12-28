@@ -85,10 +85,10 @@ if __name__ == "__main__":
     max_action = float(env.action_space.high[0])
 
     if args.algorithm == 'BCQ_L':
-        policy = BCQ_L.BCQ_L(state_dim, action_dim, max_action, threshold=args.constraint_threshold, phi=args.phi)
+        policy = BCQ_L.BCQ_L(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, phi=args.phi)
         algo_name = f"{args.algorithm}_phi-{args.phi}"
     elif args.algorithm == 'CPQ':
-        policy = CPQ.CPQ(state_dim, action_dim, max_action, threshold=args.constraint_threshold, phi=args.phi)
+        policy = CPQ.CPQ(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, phi=args.phi)
         algo_name = f"{args.algorithm}_alpha-{args.alpha}"
 
     replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
