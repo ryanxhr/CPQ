@@ -11,24 +11,30 @@ import BCQ_L, CPQ
 
 # Runs policy for X episodes and returns D4RL score
 # A fixed seed is used for the eval environment
-def eval_policy(policy, env_name, seed, mean, std, seed_offset=100, eval_episodes=10):
+def eval_policy(policy, env_name, seed, mean, std, seed_offset=100, eval_episodes=10, discount=0.99):
     eval_env = gym.make(env_name)
     eval_env.seed(seed + seed_offset)
 
     avg_reward = 0.
+    avg_cost = 0.
     for _ in range(eval_episodes):
         state, done = eval_env.reset(), False
+        step = 0
         while not done:
             state = (np.array(state).reshape(1, -1) - mean) / std
             action = policy.select_action(state)
             state, reward, done, _ = eval_env.step(action)
+            cost = np.sum(np.abs(action))
             avg_reward += reward
+            avg_cost += discount ** step * cost
+            step += 1
 
     avg_reward /= eval_episodes
+    avg_cost /= eval_episodes
     d4rl_score = eval_env.get_normalized_score(avg_reward) * 100
 
     print("---------------------------------------")
-    print(f"Evaluation over {eval_episodes} episodes: {avg_reward:.3f}, D4RL score: {d4rl_score:.3f}")
+    print(f"Evaluation over {eval_episodes} episodes, D4RL score: {d4rl_score:.3f}, Constraint Value: {avg_cost:.3f}")
     print("---------------------------------------")
     return d4rl_score
 
@@ -48,7 +54,7 @@ if __name__ == "__main__":
     parser.add_argument("--discount", default=0.99)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
     parser.add_argument("--normalize", default=True)
-    parser.add_argument("--cost_threshold", default=30.0)
+    parser.add_argument("--constraint_threshold", default=500.0)
     # BCQ-L
     parser.add_argument("--phi", default=0.05)
     # CPQ
@@ -79,10 +85,10 @@ if __name__ == "__main__":
     max_action = float(env.action_space.high[0])
 
     if args.algorithm == 'BCQ_L':
-        policy = BCQ_L.BCQ_L(state_dim, action_dim, max_action, phi=args.phi, phi=args.phi)
+        policy = BCQ_L.BCQ_L(state_dim, action_dim, max_action, threshold=args.constraint_threshold, phi=args.phi)
         algo_name = f"{args.algorithm}_phi-{args.phi}"
     elif args.algorithm == 'CPQ':
-        policy = CPQ.CPQ(state_dim, action_dim, max_action, alpha=args.alpha, phi=args.phi)
+        policy = CPQ.CPQ(state_dim, action_dim, max_action, threshold=args.constraint_threshold, phi=args.phi)
         algo_name = f"{args.algorithm}_alpha-{args.alpha}"
 
     replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
@@ -98,6 +104,6 @@ if __name__ == "__main__":
         # Evaluate episode
         if (t + 1) % args.eval_freq == 0:
             print(f"Time steps: {t + 1}")
-            evaluations.append(eval_policy(policy, args.env, args.seed, mean, std))
+            evaluations.append(eval_policy(policy, args.env, args.seed, mean, std, discount=args.discount))
             np.save(f"./results/{file_name}", evaluations)
             if args.save_model: policy.save(f"./models/{file_name}")

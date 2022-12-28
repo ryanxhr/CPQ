@@ -114,7 +114,7 @@ class VAE(nn.Module):
 
 
 class BCQ_L(object):
-    def __init__(self, state_dim, action_dim, max_action, discount=0.99, tau=0.005, lmbda=0.75, phi=0.05, threshold=30):
+    def __init__(self, state_dim, action_dim, max_action, discount=0.99, tau=0.005, lmbda=0.75, threshold=30.0, phi=0.05):
         latent_dim = action_dim * 2
 
         self.actor = Actor(state_dim, action_dim, max_action, phi=phi).to(device)
@@ -139,16 +139,25 @@ class BCQ_L(object):
         self.lmbda = lmbda
 
         self.threshold = threshold
+        self.log_lagrangian_weight = torch.zeros(1, requires_grad=True, device=device)
+        self.lagrangian_weight_optimizer = torch.optim.Adam([self.log_lagrangian_weight], lr=1e-3)
+
+        self.total_it = 0
 
     def select_action(self, state):
         with torch.no_grad():
-            state = torch.FloatTensor(state.reshape(1, -1)).repeat(100, 1).to(device)
+            # state = torch.FloatTensor(state.reshape(1, -1)).repeat(100, 1).to(device)
+            # action = self.actor(state, self.vae.decode(state))
+            # q1 = self.reward_critic.q1(state, action)
+            # ind = q1.argmax(0)
+        # return action[ind].cpu().data.numpy().flatten()
+            state = torch.FloatTensor(state.reshape(1, -1)).to(device)
             action = self.actor(state, self.vae.decode(state))
-            q1 = self.reward_critic.q1(state, action)
-            ind = q1.argmax(0)
-        return action[ind].cpu().data.numpy().flatten()
+        return action.cpu().data.numpy().flatten()
 
     def train(self, replay_buffer, batch_size=100):
+        self.total_it += 1
+
         # Sample replay buffer / batch
         state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
         cost = torch.sum(torch.abs(action), axis=1).reshape(-1, 1)
@@ -203,20 +212,22 @@ class BCQ_L(object):
         perturbed_actions = self.actor(state, sampled_actions)
 
         # Update through DPG
-        actor_loss = (-self.reward_critic.q1(state, perturbed_actions) + self.lmbda * self.cost_critic.q1(state, perturbed_actions)).mean()
+        self.lagrangian_weight = self.log_lagrangian_weight.exp()
+        qr = self.reward_critic.q1(state, perturbed_actions)
+        qc = self.cost_critic.q1(state, perturbed_actions)
+        actor_loss = (-qr + self.lagrangian_weight * qc).mean()
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
 
         # Update the Lagrangian weight
-        l_loss = -(self.log_entropy_weight * (log_pi + self.target_entropy).detach()).mean()
+        qc = self.cost_critic.q1(state, perturbed_actions)
+        lagrangian_loss = -(self.log_lagrangian_weight * (qc - self.threshold).detach()).mean()
 
-        self.entropy_weight_optimizer.zero_grad()
-        entropy_loss.backward()
-        self.entropy_weight_optimizer.step()
-
-        self.entropy_weight = self.log_entropy_weight.exp()
+        self.lagrangian_weight_optimizer.zero_grad()
+        lagrangian_loss.backward()
+        self.lagrangian_weight_optimizer.step()
 
         # Update Target Networks
         for param, target_param in zip(self.reward_critic.parameters(), self.reward_critic_target.parameters()):
@@ -227,3 +238,8 @@ class BCQ_L(object):
 
         for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+
+        if self.total_it % 5000 == 0:
+            print(f'mean qr value is {qr.mean()}')
+            print(f'mean qc value is {qc.mean()}')
+            print(f'lagrangian_weight is {self.lagrangian_weight}')
