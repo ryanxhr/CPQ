@@ -65,6 +65,12 @@ class Critic(nn.Module):
         q1 = self.l3(q1)
         return q1
 
+    def q1(self, state, action):
+        q1 = F.relu(self.l1(torch.cat([state, action], 1)))
+        q1 = F.relu(self.l2(q1))
+        q1 = self.l3(q1)
+        return q1
+
 
 # Vanilla Variational Auto-Encoder 
 class VAE(nn.Module):
@@ -108,7 +114,7 @@ class VAE(nn.Module):
 
 
 class BCQ_L(object):
-    def __init__(self, state_dim, action_dim, max_action, discount=0.99, tau=0.005, lmbda=0.75, phi=0.05):
+    def __init__(self, state_dim, action_dim, max_action, discount=0.99, tau=0.005, lmbda=0.75, phi=0.05, threshold=30):
         latent_dim = action_dim * 2
 
         self.actor = Actor(state_dim, action_dim, max_action, phi=phi).to(device)
@@ -132,6 +138,8 @@ class BCQ_L(object):
         self.tau = tau
         self.lmbda = lmbda
 
+        self.threshold = threshold
+
     def select_action(self, state):
         with torch.no_grad():
             state = torch.FloatTensor(state.reshape(1, -1)).repeat(100, 1).to(device)
@@ -143,7 +151,7 @@ class BCQ_L(object):
     def train(self, replay_buffer, batch_size=100):
         # Sample replay buffer / batch
         state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
-        cost = np.sum(np.abs(action))
+        cost = torch.sum(torch.abs(action), axis=1).reshape(-1, 1)
 
         # Variational Auto-Encoder Training
         recon, mean, std = self.vae(state, action)
@@ -195,11 +203,20 @@ class BCQ_L(object):
         perturbed_actions = self.actor(state, sampled_actions)
 
         # Update through DPG
-        actor_loss = -self.reward_critic.q1(state, perturbed_actions).mean()
+        actor_loss = (-self.reward_critic.q1(state, perturbed_actions) + self.lmbda * self.cost_critic.q1(state, perturbed_actions)).mean()
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
+
+        # Update the Lagrangian weight
+        l_loss = -(self.log_entropy_weight * (log_pi + self.target_entropy).detach()).mean()
+
+        self.entropy_weight_optimizer.zero_grad()
+        entropy_loss.backward()
+        self.entropy_weight_optimizer.step()
+
+        self.entropy_weight = self.log_entropy_weight.exp()
 
         # Update Target Networks
         for param, target_param in zip(self.reward_critic.parameters(), self.reward_critic_target.parameters()):

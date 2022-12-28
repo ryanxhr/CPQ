@@ -48,8 +48,11 @@ if __name__ == "__main__":
     parser.add_argument("--discount", default=0.99)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
     parser.add_argument("--normalize", default=True)
+    parser.add_argument("--cost_threshold", default=30.0)
     # BCQ-L
     parser.add_argument("--phi", default=0.05)
+    # CPQ
+    parser.add_argument("--alpha", default=1.0)
     args = parser.parse_args()
 
     file_name = f"{args.algorithm}_{args.env}_{args.seed}"
@@ -76,10 +79,10 @@ if __name__ == "__main__":
     max_action = float(env.action_space.high[0])
 
     if args.algorithm == 'BCQ_L':
-        policy = BCQ_L.BCQ_L(state_dim, action_dim, max_action, phi=args.phi)
+        policy = BCQ_L.BCQ_L(state_dim, action_dim, max_action, phi=args.phi, phi=args.phi)
         algo_name = f"{args.algorithm}_phi-{args.phi}"
     elif args.algorithm == 'CPQ':
-        policy = CPQ.CPQ(state_dim, action_dim, max_action, alpha=args.alpha)
+        policy = CPQ.CPQ(state_dim, action_dim, max_action, alpha=args.alpha, phi=args.phi)
         algo_name = f"{args.algorithm}_alpha-{args.alpha}"
 
     replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
