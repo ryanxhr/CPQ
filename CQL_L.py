@@ -11,7 +11,7 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action, hidden_unit=256):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim + action_dim, hidden_unit)
+        self.l1 = nn.Linear(state_dim, hidden_unit)
         self.l2 = nn.Linear(hidden_unit, hidden_unit)
         self.l3 = nn.Linear(hidden_unit, action_dim)
 

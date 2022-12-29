@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # Experiment
-    parser.add_argument("--algorithm", default="CPQ")  # Policy name
+    parser.add_argument("--algorithm", default="CQL_L")  # Policy name
     parser.add_argument("--env", default="hopper-medium-expert-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=0, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
@@ -90,6 +90,9 @@ if __name__ == "__main__":
         algo_name = f"{args.algorithm}_phi-{args.phi}"
     elif args.algorithm == 'CPQ':
         policy = CPQ.CPQ(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, alpha=args.alpha)
+        algo_name = f"{args.algorithm}_alpha-{args.alpha}"
+    elif args.algorithm == 'CQL_L':
+        policy = CQL_L.CQL_L(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, alpha=args.alpha)
         algo_name = f"{args.algorithm}_alpha-{args.alpha}"
 
     replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
