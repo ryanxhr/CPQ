@@ -193,7 +193,7 @@ class CPQ(object):
         td_qc_loss = F.mse_loss(current_Qc, target_Qc)
 
         cql_qc_ood = self.cost_critic(state, self.actor(state))
-        cql_qc_diff = cql_qr2_ood - current_Qr2
+        cql_qc_diff = cql_qc_ood - current_Qc
         cql_qc_loss = -self.alpha * cql_qc_diff.mean()
 
         cost_critic_loss = td_qc_loss + cql_qc_loss
