@@ -11,7 +11,7 @@ import BCQ_L, CPQ
 
 # Runs policy for X episodes and returns D4RL score
 # A fixed seed is used for the eval environment
-def eval_policy(policy, env_name, seed, mean, std, seed_offset=100, eval_episodes=10, discount=0.99):
+def eval_policy(policy, env_name, seed, mean, std, constraint_threshold, seed_offset=100, eval_episodes=10, discount=0.99):
     eval_env = gym.make(env_name)
     eval_env.seed(seed + seed_offset)
 
@@ -34,7 +34,8 @@ def eval_policy(policy, env_name, seed, mean, std, seed_offset=100, eval_episode
     d4rl_score = eval_env.get_normalized_score(avg_reward) * 100
 
     print("---------------------------------------")
-    print(f"Evaluation over {eval_episodes} episodes, D4RL score: {d4rl_score:.3f}, Constraint Value: {avg_cost:.3f}")
+    print(f"Evaluation over {eval_episodes} episodes, D4RL score: {d4rl_score:.3f}, "
+          f"Constraint Value: {avg_cost:.3f}, Constraint Threshold: {constraint_threshold:.3f}")
     print("---------------------------------------")
     return d4rl_score
 
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment
     parser.add_argument("--algorithm", default="BCQ_L")  # Policy name
-    parser.add_argument("--env", default="hopper-medium-v2")  # OpenAI gym environment name
+    parser.add_argument("--env", default="hopper-medium-expert-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=0, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
     parser.add_argument("--max_timesteps", default=1e6, type=int)  # Max time steps to run environment
@@ -54,14 +55,14 @@ if __name__ == "__main__":
     parser.add_argument("--discount", default=1.0)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
     parser.add_argument("--normalize", default=True)
-    parser.add_argument("--constraint_threshold", default=500.0)
+    parser.add_argument("--constraint_threshold", default=683)
     # BCQ-L
     parser.add_argument("--phi", default=0.05)
     # CPQ
     parser.add_argument("--alpha", default=1.0)
     args = parser.parse_args()
 
-    file_name = f"{args.algorithm}_{args.env}_{args.seed}"
+    file_name = f"{args.algorithm}_{args.env}_{args.seed}_{args.constraint_threshold}"
     print("---------------------------------------")
     print(f"Policy: {args.algorithm}, Env: {args.env}, Seed: {args.seed}")
     print("---------------------------------------")
@@ -104,6 +105,6 @@ if __name__ == "__main__":
         # Evaluate episode
         if (t + 1) % args.eval_freq == 0:
             print(f"Time steps: {t + 1}")
-            evaluations.append(eval_policy(policy, args.env, args.seed, mean, std, discount=args.discount))
+            evaluations.append(eval_policy(policy, args.env, args.seed, mean, std, args.constraint_threshold, discount=args.discount))
             np.save(f"./results/{file_name}", evaluations)
             if args.save_model: policy.save(f"./models/{file_name}")

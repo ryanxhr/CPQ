@@ -8,20 +8,19 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, max_action, hidden_unit=256, phi=0.05):
+    def __init__(self, state_dim, action_dim, max_action, hidden_unit=256):
         super(Actor, self).__init__()
+
         self.l1 = nn.Linear(state_dim + action_dim, hidden_unit)
         self.l2 = nn.Linear(hidden_unit, hidden_unit)
         self.l3 = nn.Linear(hidden_unit, action_dim)
 
         self.max_action = max_action
-        self.phi = phi
 
-    def forward(self, state, action):
-        a = F.relu(self.l1(torch.cat([state, action], 1)))
+    def forward(self, state):
+        a = F.relu(self.l1(state))
         a = F.relu(self.l2(a))
-        a = self.phi * self.max_action * torch.tanh(self.l3(a))
-        return (a + action).clamp(-self.max_action, self.max_action)
+        return self.max_action * torch.tanh(self.l3(a))
 
 
 class Double_Critic(nn.Module):
@@ -113,12 +112,11 @@ class VAE(nn.Module):
         return self.max_action * torch.tanh(self.d3(a))
 
 
-class BCQ_L(object):
-    def __init__(self, state_dim, action_dim, max_action, discount=0.99, tau=0.005, lmbda=0.75, threshold=30.0, phi=0.05):
+class CPQ(object):
+    def __init__(self, state_dim, action_dim, max_action, discount=0.99, tau=0.005, lmbda=0.75, threshold=30.0, alpha=1.0):
         latent_dim = action_dim * 2
 
-        self.actor = Actor(state_dim, action_dim, max_action, phi=phi).to(device)
-        self.actor_target = copy.deepcopy(self.actor)
+        self.actor = Actor(state_dim, action_dim, max_action).to(device)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=1e-3)
 
         self.reward_critic = Double_Critic(state_dim, action_dim).to(device)
@@ -138,6 +136,8 @@ class BCQ_L(object):
         self.tau = tau
         self.lmbda = lmbda
 
+        self.alpha = alpha
+
         self.threshold = threshold
         self.log_lagrangian_weight = torch.zeros(1, requires_grad=True, device=device)
         self.lagrangian_weight_optimizer = torch.optim.Adam([self.log_lagrangian_weight], lr=1e-3)
@@ -152,7 +152,7 @@ class BCQ_L(object):
             # ind = q1.argmax(0)
             # return action[ind].cpu().data.numpy().flatten()
             state = torch.FloatTensor(state.reshape(1, -1)).to(device)
-            action = self.actor(state, self.vae.decode(state))
+            action = self.actor(state)
         return action.cpu().data.numpy().flatten()
 
     def train(self, replay_buffer, batch_size=100):
@@ -162,33 +162,22 @@ class BCQ_L(object):
         state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
         cost = torch.sum(torch.abs(action), axis=1).reshape(-1, 1)
 
-        # Variational Auto-Encoder Training
-        recon, mean, std = self.vae(state, action)
-        recon_loss = F.mse_loss(recon, action)
-        KL_loss	= -0.5 * (1 + torch.log(std.pow(2)) - mean.pow(2) - std.pow(2)).mean()
-        vae_loss = recon_loss + 0.5 * KL_loss
-
-        self.vae_optimizer.zero_grad()
-        vae_loss.backward()
-        self.vae_optimizer.step()
-
         # Reward Critic Training
         with torch.no_grad():
-            # Duplicate next state 10 times
-            next_state_dup = torch.repeat_interleave(next_state, 10, 0)
-
-            # Compute value of perturbed actions sampled from the VAE
-            target_Qr1, target_Qr2 = self.reward_critic_target(next_state_dup, self.actor_target(next_state_dup, self.vae.decode(next_state_dup)))
-
+            target_Qr1, target_Qr2 = self.reward_critic_target(next_state, self.actor(next_state))
             # Soft Clipped Double Q-learning
-            target_Qr = self.lmbda * torch.min(target_Qr1, target_Qr2) + (1. - self.lmbda) * torch.max(target_Qr1, target_Qr2)
-            # Take max over each action sampled from the VAE
-            target_Qr = target_Qr.reshape(batch_size, -1).max(1)[0].reshape(-1, 1)
-
+            target_Qr = torch.min(target_Qr1, target_Qr2)
             target_Qr = reward + not_done * self.discount * target_Qr
 
         current_Qr1, current_Qr2 = self.reward_critic(state, action)
-        reward_critic_loss = F.mse_loss(current_Qr1, target_Qr) + F.mse_loss(current_Qr2, target_Qr)
+        td_loss = F.mse_loss(current_Qr1, target_Qr) + F.mse_loss(current_Qr2, target_Qr)
+
+        cql_qr1_ood, cql_qr2_ood = self.reward_critic(state, self.actor(state))
+        cql_qr1_diff = cql_qr1_ood - current_Qr1
+        cql_qr2_diff = cql_qr2_ood - current_Qr2
+        cql_loss = self.alpha * (cql_qr1_diff + cql_qr2_diff)
+
+        reward_critic_loss = td_loss + cql_loss
 
         self.reward_critic_optimizer.zero_grad()
         reward_critic_loss.backward()
@@ -197,7 +186,7 @@ class BCQ_L(object):
         # Cost Critic Training
         with torch.no_grad():
             # Compute value of perturbed actions sampled from the VAE
-            target_Qc = self.cost_critic_target(next_state, self.actor_target(next_state, self.vae.decode(next_state)))
+            target_Qc = self.cost_critic_target(next_state, self.actor(next_state))
             target_Qc = cost + not_done * self.discount * target_Qc
 
         current_Qc = self.cost_critic(state, action)
@@ -208,13 +197,12 @@ class BCQ_L(object):
         self.cost_critic_optimizer.step()
 
         # Pertubation Model / Action Training
-        sampled_actions = self.vae.decode(state)
-        perturbed_actions = self.actor(state, sampled_actions)
+        pi_action = self.actor(state)
 
         # Update through DPG
         self.lagrangian_weight = self.log_lagrangian_weight.exp()
-        qr = self.reward_critic.q1(state, perturbed_actions)
-        qc = self.cost_critic.q1(state, perturbed_actions)
+        qr = self.reward_critic.q1(state, pi_action)
+        qc = self.cost_critic.q1(state, pi_action)
         actor_loss = (-qr + self.lagrangian_weight * qc).mean()
 
         self.actor_optimizer.zero_grad()
@@ -222,21 +210,19 @@ class BCQ_L(object):
         self.actor_optimizer.step()
 
         # Update the Lagrangian weight
-        qc = self.cost_critic.q1(state, perturbed_actions)
-        lagrangian_loss = -(self.log_lagrangian_weight * (qc - self.threshold).detach()).mean()
+        if self.total_it > 150000:
+            qc = self.cost_critic.q1(state, pi_action)
+            lagrangian_loss = -(self.log_lagrangian_weight * (qc - self.threshold).detach()).mean()
 
-        self.lagrangian_weight_optimizer.zero_grad()
-        lagrangian_loss.backward()
-        self.lagrangian_weight_optimizer.step()
+            self.lagrangian_weight_optimizer.zero_grad()
+            lagrangian_loss.backward()
+            self.lagrangian_weight_optimizer.step()
 
         # Update Target Networks
         for param, target_param in zip(self.reward_critic.parameters(), self.reward_critic_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
         for param, target_param in zip(self.cost_critic.parameters(), self.cost_critic_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
-
-        for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
         if self.total_it % 5000 == 0:

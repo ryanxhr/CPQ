@@ -118,7 +118,7 @@ class BCQ_L(object):
         latent_dim = action_dim * 2
 
         self.actor = Actor(state_dim, action_dim, max_action, phi=phi).to(device)
-        self.actor_target = copy.deepcopy(self.actor)
+        # self.actor_target = copy.deepcopy(self.actor)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=1e-3)
 
         self.reward_critic = Double_Critic(state_dim, action_dim).to(device)
@@ -178,7 +178,7 @@ class BCQ_L(object):
             next_state_dup = torch.repeat_interleave(next_state, 10, 0)
 
             # Compute value of perturbed actions sampled from the VAE
-            target_Qr1, target_Qr2 = self.reward_critic_target(next_state_dup, self.actor_target(next_state_dup, self.vae.decode(next_state_dup)))
+            target_Qr1, target_Qr2 = self.reward_critic_target(next_state_dup, self.actor(next_state_dup, self.vae.decode(next_state_dup)))
 
             # Soft Clipped Double Q-learning
             target_Qr = self.lmbda * torch.min(target_Qr1, target_Qr2) + (1. - self.lmbda) * torch.max(target_Qr1, target_Qr2)
@@ -197,7 +197,7 @@ class BCQ_L(object):
         # Cost Critic Training
         with torch.no_grad():
             # Compute value of perturbed actions sampled from the VAE
-            target_Qc = self.cost_critic_target(next_state, self.actor_target(next_state, self.vae.decode(next_state)))
+            target_Qc = self.cost_critic_target(next_state, self.actor(next_state, self.vae.decode(next_state)))
             target_Qc = cost + not_done * self.discount * target_Qc
 
         current_Qc = self.cost_critic(state, action)
@@ -222,12 +222,13 @@ class BCQ_L(object):
         self.actor_optimizer.step()
 
         # Update the Lagrangian weight
-        qc = self.cost_critic.q1(state, perturbed_actions)
-        lagrangian_loss = -(self.log_lagrangian_weight * (qc - self.threshold).detach()).mean()
+        if self.total_it > 150000:
+            qc = self.cost_critic.q1(state, perturbed_actions)
+            lagrangian_loss = -(self.log_lagrangian_weight * (qc - self.threshold).detach()).mean()
 
-        self.lagrangian_weight_optimizer.zero_grad()
-        lagrangian_loss.backward()
-        self.lagrangian_weight_optimizer.step()
+            self.lagrangian_weight_optimizer.zero_grad()
+            lagrangian_loss.backward()
+            self.lagrangian_weight_optimizer.step()
 
         # Update Target Networks
         for param, target_param in zip(self.reward_critic.parameters(), self.reward_critic_target.parameters()):
@@ -236,8 +237,8 @@ class BCQ_L(object):
         for param, target_param in zip(self.cost_critic.parameters(), self.cost_critic_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-        for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        # for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+        #     target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
         if self.total_it % 5000 == 0:
             print(f'mean qr value is {qr.mean()}')
