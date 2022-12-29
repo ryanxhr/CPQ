@@ -6,7 +6,7 @@ import os
 import d4rl
 
 import utils
-import BCQ_L, CPQ
+import BCQ_L, CQL_L, CPQ
 
 
 # Runs policy for X episodes and returns D4RL score
@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # Experiment
-    parser.add_argument("--algorithm", default="BCQ_L")  # Policy name
+    parser.add_argument("--algorithm", default="CPQ")  # Policy name
     parser.add_argument("--env", default="hopper-medium-expert-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=0, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     # BCQ-L
     parser.add_argument("--phi", default=0.05)
     # CPQ
-    parser.add_argument("--alpha", default=1.0)
+    parser.add_argument("--alpha", default=2.0)
     args = parser.parse_args()
 
     file_name = f"{args.algorithm}_{args.env}_{args.seed}_{args.constraint_threshold}"
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         policy = BCQ_L.BCQ_L(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, phi=args.phi)
         algo_name = f"{args.algorithm}_phi-{args.phi}"
     elif args.algorithm == 'CPQ':
-        policy = CPQ.CPQ(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, phi=args.phi)
+        policy = CPQ.CPQ(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, alpha=args.alpha)
         algo_name = f"{args.algorithm}_alpha-{args.alpha}"
 
     replay_buffer = utils.ReplayBuffer(state_dim, action_dim)

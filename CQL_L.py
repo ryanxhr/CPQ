@@ -112,7 +112,7 @@ class VAE(nn.Module):
         return self.max_action * torch.tanh(self.d3(a))
 
 
-class CPQ(object):
+class CQL_L(object):
     def __init__(self, state_dim, action_dim, max_action, discount=0.99, tau=0.005, lmbda=0.75, threshold=30.0, alpha=1.0):
         latent_dim = action_dim * 2
 
@@ -175,7 +175,7 @@ class CPQ(object):
         cql_qr1_ood, cql_qr2_ood = self.reward_critic(state, self.actor(state))
         cql_qr1_diff = cql_qr1_ood - current_Qr1
         cql_qr2_diff = cql_qr2_ood - current_Qr2
-        cql_loss = self.alpha * (cql_qr1_diff + cql_qr2_diff)
+        cql_loss = self.alpha * (cql_qr1_diff + cql_qr2_diff).mean()
 
         reward_critic_loss = td_loss + cql_loss
 
