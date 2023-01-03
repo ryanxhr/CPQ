@@ -218,7 +218,9 @@ class CPQ(object):
             target_Qr1, target_Qr2 = self.reward_critic_target(next_state, next_action)
             # Soft Clipped Double Q-learning
             target_Qr = torch.min(target_Qr1, target_Qr2)
-            target_Qr = reward + not_done * 0.99 * target_Qr
+            target_Qc = self.cost_critic_target(next_state, next_action)
+            weight = torch.where(target_Qc > self.threshold, 0.0, 1.0)
+            target_Qr = reward + not_done * 0.99 * target_Qr * weight
         current_Qr1, current_Qr2 = self.reward_critic(state, action)
 
         td_qr_loss = F.mse_loss(current_Qr1, target_Qr) + F.mse_loss(current_Qr2, target_Qr)
@@ -309,9 +311,8 @@ class CPQ(object):
         pi, log_pi, _ = self.actor(state)
         qr1_pi, qr2_pi = self.reward_critic(state, pi)
         qr_pi = torch.squeeze(torch.min(qr1_pi, qr2_pi))
-        qc_pi = self.cost_critic.q1(state, pi)
-        qr_weight = torch.where(qc_pi > self.threshold, 0.0, 1.0)
-        actor_loss = (-qr_pi * qr_weight).mean()
+        qc_pi = self.cost_critic(state, pi)
+        actor_loss = (-qr_pi).mean()
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -327,4 +328,4 @@ class CPQ(object):
         if self.total_it % 5000 == 0:
             print(f'mean qr value is {qr_pi.mean()}')
             print(f'mean qc value is {qc_pi.mean()}')
-            print(f'mean qr_weight value is {qr_weight.mean()}')
+            print(f'mean qr_weight value is {weight.mean()}')
