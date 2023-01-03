@@ -44,8 +44,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # Experiment
-    parser.add_argument("--algorithm", default="CQL_L")  # Policy name
-    parser.add_argument("--env", default="hopper-medium-expert-v2")  # OpenAI gym environment name
+    parser.add_argument("--algorithm", default="CPQ")  # Policy name
+    parser.add_argument("--env", default="hopper-medium-replay-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=0, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
     parser.add_argument("--max_timesteps", default=1e6, type=int)  # Max time steps to run environment
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     parser.add_argument("--discount", default=1.0)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
     parser.add_argument("--normalize", default=True)
-    parser.add_argument("--constraint_threshold", default=683)
+    parser.add_argument("--constraint_threshold", default=184, type=float)
     # BCQ-L
     parser.add_argument("--phi", default=0.05)
     # CPQ
