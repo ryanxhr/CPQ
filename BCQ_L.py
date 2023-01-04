@@ -127,7 +127,7 @@ class BCQ_L(object):
 
         self.cost_critic = Critic(state_dim, action_dim).to(device)
         self.cost_critic_target = copy.deepcopy(self.cost_critic)
-        self.cost_critic_optimizer = torch.optim.Adam(self.cost_critic.parameters(), lr=1e-5)
+        self.cost_critic_optimizer = torch.optim.Adam(self.cost_critic.parameters(), lr=1e-4)
 
         self.vae = VAE(state_dim, action_dim, latent_dim, max_action).to(device)
         self.vae_optimizer = torch.optim.Adam(self.vae.parameters())
@@ -140,7 +140,7 @@ class BCQ_L(object):
 
         self.threshold = threshold
         self.log_lagrangian_weight = torch.zeros(1, requires_grad=True, device=device)
-        self.lagrangian_weight_optimizer = torch.optim.Adam([self.log_lagrangian_weight], lr=1e-4)
+        self.lagrangian_weight_optimizer = torch.optim.Adam([self.log_lagrangian_weight], lr=1e-5)
 
         self.total_it = 0
 
@@ -215,7 +215,8 @@ class BCQ_L(object):
         self.lagrangian_weight = self.log_lagrangian_weight.exp()
         qr = self.reward_critic.q1(state, perturbed_actions)
         qc = self.cost_critic.q1(state, perturbed_actions)
-        actor_loss = (-qr + self.lagrangian_weight * qc).mean()
+        # actor_loss = (-qr + self.lagrangian_weight * qc).mean()
+        actor_loss = (-qr).mean()
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()

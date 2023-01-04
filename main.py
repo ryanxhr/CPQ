@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # Experiment
-    parser.add_argument("--algorithm", default="CPQ")  # Policy name
+    parser.add_argument("--algorithm", default="BCQ_L")  # Policy name
     parser.add_argument("--env", default="hopper-medium-replay-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=0, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
