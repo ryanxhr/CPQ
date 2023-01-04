@@ -6,7 +6,7 @@ import os
 import d4rl
 
 import utils
-import BCQ_L, CQL_L, CPQ
+import BCQ_L, CPQ
 
 
 # Runs policy for X episodes and returns D4RL score
@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # Experiment
-    parser.add_argument("--algorithm", default="BCQ_L")  # Policy name
+    parser.add_argument("--algorithm", default="CPQ")  # Policy name
     parser.add_argument("--env", default="hopper-medium-replay-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=0, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
@@ -52,10 +52,10 @@ if __name__ == "__main__":
     parser.add_argument("--save_model", action="store_true")  # Save model and optimizer parameters
     parser.add_argument("--load_model", default="")  # Model load file name, "" doesn't load, "default" uses file_name
     parser.add_argument("--batch_size", default=256, type=int)  # Batch size for both actor and critic
-    parser.add_argument("--discount", default=1.0)  # Discount factor
+    parser.add_argument("--discount", default=0.99)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
     parser.add_argument("--normalize", default=True)
-    parser.add_argument("--constraint_threshold", default=184, type=float)
+    parser.add_argument("--constraint_threshold", default=50, type=float)
     # BCQ-L
     parser.add_argument("--phi", default=0.05)
     # CPQ

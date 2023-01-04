@@ -168,15 +168,15 @@ class CPQ(object):
         latent_dim = action_dim * 2
 
         self.actor = Actor(state_dim, action_dim, max_action).to(device)
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=3e-4)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=1e-4)
 
         self.reward_critic = Double_Critic(state_dim, action_dim).to(device)
         self.reward_critic_target = copy.deepcopy(self.reward_critic)
-        self.reward_critic_optimizer = torch.optim.Adam(self.reward_critic.parameters(), lr=3e-4)
+        self.reward_critic_optimizer = torch.optim.Adam(self.reward_critic.parameters(), lr=1e-4)
 
         self.cost_critic = Critic(state_dim, action_dim).to(device)
         self.cost_critic_target = copy.deepcopy(self.cost_critic)
-        self.cost_critic_optimizer = torch.optim.Adam(self.cost_critic.parameters(), lr=3e-4)
+        self.cost_critic_optimizer = torch.optim.Adam(self.cost_critic.parameters(), lr=1e-4)
 
         self.vae = VAE(state_dim, action_dim, latent_dim, max_action).to(device)
         self.vae_optimizer = torch.optim.Adam(self.vae.parameters())
@@ -195,7 +195,7 @@ class CPQ(object):
 
         self.threshold = threshold
         self.log_lagrangian_weight = torch.zeros(1, requires_grad=True, device=device)
-        self.lagrangian_weight_optimizer = torch.optim.Adam([self.log_lagrangian_weight], lr=1e-3)
+        self.lagrangian_weight_optimizer = torch.optim.Adam([self.log_lagrangian_weight], lr=1e-4)
 
         self.total_it = 0
 
