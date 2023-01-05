@@ -91,9 +91,6 @@ if __name__ == "__main__":
     elif args.algorithm == 'CPQ':
         policy = CPQ.CPQ(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, alpha=args.alpha)
         algo_name = f"{args.algorithm}_alpha-{args.alpha}"
-    elif args.algorithm == 'CQL_L':
-        policy = CQL_L.CQL_L(state_dim, action_dim, max_action, discount=args.discount, threshold=args.constraint_threshold, alpha=args.alpha)
-        algo_name = f"{args.algorithm}_alpha-{args.alpha}"
 
     replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
     replay_buffer.convert_D4RL(d4rl.qlearning_dataset(env))
