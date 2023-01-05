@@ -55,7 +55,7 @@ if __name__ == "__main__":
     parser.add_argument("--discount", default=0.99)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
     parser.add_argument("--normalize", default=True)
-    parser.add_argument("--constraint_threshold", default=50, type=float)
+    parser.add_argument("--constraint_threshold", default=100, type=float)
     # BCQ-L
     parser.add_argument("--phi", default=0.05)
     # CPQ

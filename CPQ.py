@@ -328,4 +328,3 @@ class CPQ(object):
         if self.total_it % 5000 == 0:
             print(f'mean qr value is {qr_pi.mean()}')
             print(f'mean qc value is {qc_pi.mean()}')
-            print(f'mean qr_weight value is {weight.mean()}')

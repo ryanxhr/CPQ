@@ -215,8 +215,7 @@ class BCQ_L(object):
         self.lagrangian_weight = self.log_lagrangian_weight.exp()
         qr = self.reward_critic.q1(state, perturbed_actions)
         qc = self.cost_critic.q1(state, perturbed_actions)
-        # actor_loss = (-qr + self.lagrangian_weight * qc).mean()
-        actor_loss = (-qr).mean()
+        actor_loss = (-qr + self.lagrangian_weight * qc).mean()
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
