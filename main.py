@@ -15,8 +15,9 @@ def eval_policy(policy, env_name, seed, mean, std, constraint_threshold, seed_of
     eval_env = gym.make(env_name)
     eval_env.seed(seed + seed_offset)
 
-    avg_reward = 0.
-    avg_cost = 0.
+    tot_reward = 0.
+    tot_cost = 0.
+    discounted_cost = 0.
     for _ in range(eval_episodes):
         state, done = eval_env.reset(), False
         step = 0
@@ -25,26 +26,28 @@ def eval_policy(policy, env_name, seed, mean, std, constraint_threshold, seed_of
             action = policy.select_action(state)
             state, reward, done, _ = eval_env.step(action)
             cost = np.sum(np.abs(action))
-            avg_reward += reward
-            avg_cost += discount ** step * cost
+            tot_reward += reward
+            tot_cost += cost
+            discounted_cost += discount ** step * cost
             step += 1
 
-    avg_reward /= eval_episodes
-    avg_cost /= eval_episodes
-    d4rl_score = eval_env.get_normalized_score(avg_reward) * 100
+    tot_reward /= eval_episodes
+    tot_cost /= eval_episodes
+    discounted_cost /= eval_episodes
+    d4rl_score = eval_env.get_normalized_score(tot_reward) * 100
 
     print("---------------------------------------")
-    print(f"Evaluation over {eval_episodes} episodes, D4RL score: {d4rl_score:.3f}, "
-          f"Constraint Value: {avg_cost:.3f}, Constraint Threshold: {constraint_threshold:.3f}")
+    print(f"Evaluation over {eval_episodes} episodes, D4RL score: {d4rl_score:.3f}, Total return: {tot_reward:.3f}, "
+          f"Constraint Value (discounted): {discounted_cost:.3f}, Constraint Value (undiscounted): {tot_cost:.3f}, Constraint Threshold: {constraint_threshold:.3f}")
     print("---------------------------------------")
-    return d4rl_score
+    return tot_reward, discounted_cost, tot_cost
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # Experiment
-    parser.add_argument("--algorithm", default="BCQ_L")  # Policy name
+    parser.add_argument("--algorithm", default="CPQ")  # Policy name
     parser.add_argument("--env", default="hopper-medium-replay-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=0, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
@@ -52,19 +55,19 @@ if __name__ == "__main__":
     parser.add_argument("--save_model", action="store_true")  # Save model and optimizer parameters
     parser.add_argument("--load_model", default="")  # Model load file name, "" doesn't load, "default" uses file_name
     parser.add_argument("--batch_size", default=256, type=int)  # Batch size for both actor and critic
-    parser.add_argument("--discount", default=0.99)  # Discount factor
+    parser.add_argument("--discount", default=0.99, type=float)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
     parser.add_argument("--normalize", default=True)
-    parser.add_argument("--constraint_threshold", default=100, type=float)
+    parser.add_argument("--constraint_threshold", default=683, type=float)
     # BCQ-L
     parser.add_argument("--phi", default=0.05)
     # CPQ
-    parser.add_argument("--alpha", default=2.0)
+    parser.add_argument("--alpha", default=10)
     args = parser.parse_args()
 
-    file_name = f"{args.algorithm}_{args.env}_{args.seed}_{args.constraint_threshold}"
+    save_dir = f"./results/{args.algorithm}_{args.env}_{args.discount}_{args.constraint_threshold}_{args.seed}.txt"
     print("---------------------------------------")
-    print(f"Policy: {args.algorithm}, Env: {args.env}, Seed: {args.seed}")
+    print(f"Policy: {args.algorithm}, Env: {args.env}, Seed: {args.seed}, Gamma: {args.discount}, Cost_limit: {args.constraint_threshold}")
     print("---------------------------------------")
 
     if not os.path.exists("./results"):
@@ -99,12 +102,14 @@ if __name__ == "__main__":
     else:
         mean, std = 0, 1
 
-    evaluations = []
+    eval_log = open(save_dir, 'w')
+    # Start training
     for t in range(int(args.max_timesteps)):
         policy.train(replay_buffer, args.batch_size)
         # Evaluate episode
         if (t + 1) % args.eval_freq == 0:
             print(f"Time steps: {t + 1}")
-            evaluations.append(eval_policy(policy, args.env, args.seed, mean, std, args.constraint_threshold, discount=args.discount))
-            np.save(f"./results/{file_name}", evaluations)
-            if args.save_model: policy.save(f"./models/{file_name}")
+            average_return, discounted_cost, _ = eval_policy(policy, args.env, args.seed, mean, std, args.constraint_threshold, discount=args.discount)
+            eval_log.write(f'{t + 1},{average_return},{discounted_cost}\n')
+            eval_log.flush()
+    eval_log.close()
